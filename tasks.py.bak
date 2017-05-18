@@ -14,7 +14,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 '''
-import pickle
+import cPickle
 import importlib
 import logging
 import random
@@ -177,7 +177,7 @@ class DeferredHandler(webapp2.RequestHandler):
         """ Executes a deferred task """
         # Add some task debug information.
         headers = []
-        for key, value in list(self.request.headers.items()):
+        for key, value in self.request.headers.items():
             k = key.lower()
             if k.startswith("x-appengine-") and k not in self._SKIP_HEADERS:
                 headers.append("%s:%s" % (key, value))
@@ -190,7 +190,7 @@ class DeferredHandler(webapp2.RequestHandler):
         # Make sure we are called from the Task Queue (security)
         if isFromTaskQueue(self.request):
             try:
-                func, args, kwds = pickle.loads(self.request.body)
+                func, args, kwds = cPickle.loads(self.request.body)
             except Exception:
                 logging.exception("Permanent failure attempting to execute task")
                 return
@@ -249,16 +249,16 @@ def _curry_callable(obj, args, kwargs):
       ValueError: If the passed in object is not of a valid callable type.
     """
     if isinstance(obj, types.MethodType):
-        return (_invokeMember, (obj.__self__, obj.__func__.__name__) + args, kwargs)
+        return (_invokeMember, (obj.im_self, obj.im_func.__name__) + args, kwargs)
     elif isinstance(obj, types.BuiltinMethodType):
         if not obj.__self__:
             return (obj, args, kwargs)
         else:
             return (_invokeMember, (obj.__self__, obj.__name__) + args, kwargs)
-    elif isinstance(obj, object) and hasattr(obj, "__call__"):
+    elif isinstance(obj, types.ObjectType) and hasattr(obj, "__call__"):
         return (obj, args, kwargs)
     elif isinstance(obj, (types.FunctionType, types.BuiltinFunctionType,
-                          type, types.UnboundMethodType)):
+                          types.ClassType, types.UnboundMethodType)):
         return (obj, args, kwargs)
     else:
         raise ValueError("obj must be callable")
@@ -275,4 +275,4 @@ def _serialize(obj, args, kwargs):
       A serialized representation of the callable.
     """
     curried = _curry_callable(obj, args, kwargs)
-    return pickle.dumps(curried, protocol=pickle.HIGHEST_PROTOCOL)
+    return cPickle.dumps(curried, protocol=cPickle.HIGHEST_PROTOCOL)
